@@ -1,88 +1,91 @@
-var chrome_title_tag_last_change = 0;
+let lastTitleChangeTimestamp = 0;
 
-var chrome_title_tag = {
+const chromeTitleTag = {
   div: document.createElement("div"),
 
   /**
    * Updates the title text with the new title, unless it's been less than 1 second since last update
    * @return (void)
    */
-  set_title: function () {
-    var tolong_cutoff = 65;
-    var ts = Math.round(new Date().getTime() / 1000); // unix timestamp in seconds
-    if (chrome_title_tag_last_change > ts - 1) {
+  setTitle: function () {
+    const TITLE_LENGTH_CUTOFF = 65;
+    const currentTimestamp = Math.round(new Date().getTime() / 1000); // unix timestamp in seconds
+
+    if (lastTitleChangeTimestamp > currentTimestamp - 1) {
       return false;
     }
-    chrome_title_tag_last_change = ts;
+    lastTitleChangeTimestamp = currentTimestamp;
 
-    var htmltitle = document.title;
+    let htmlTitle = document.title;
 
-    if (htmltitle.length > tolong_cutoff) {
-      htmltitle =
-        htmltitle.slice(0, tolong_cutoff) +
+    // HTMLタイトルが非常に長い場合に、特定の位置で切り取り、そこに「TOLONGCUTOFF」というマーカーを挿入する
+    if (htmlTitle.length > TITLE_LENGTH_CUTOFF) {
+      htmlTitle =
+        htmlTitle.slice(0, TITLE_LENGTH_CUTOFF) +
         "TOLONGCUTOFF" +
-        htmltitle.slice(tolong_cutoff);
+        htmlTitle.slice(TITLE_LENGTH_CUTOFF);
     }
 
-    htmltitle = htmlSpecialChars(htmltitle);
+    // XSS対策で特殊文字の対策をする
+    htmlTitle = htmlSpecialChars(htmlTitle);
 
-    if (htmltitle.length > tolong_cutoff) {
-      htmltitle =
-        htmltitle.replace("TOLONGCUTOFF", '<span class="tolong">') + "</span>";
+    // 処理後タイトルの長さを取得してブラウザに表示するスタイルを変更する
+    if (htmlTitle.length > TITLE_LENGTH_CUTOFF) {
+      htmlTitle =
+        htmlTitle.replace("TOLONGCUTOFF", '<span class="tolong">') + "</span>";
     }
 
-    var titlelength = parseInt(document.title.length);
-    var showtitle_title = document.getElementById("showtitle-title");
-    if (showtitle_title !== null) {
-      showtitle_title.setAttribute(
-        "title",
-        "Length: " + titlelength + " chars"
-      );
-      showtitle_title.innerHTML = htmltitle;
+    // DOM要素を更新する
+    const titleElement = document.getElementById("showtitle-title");
+    if (titleElement) {
+      const titleLength = parseInt(document.title.length);
+      titleElement.setAttribute("title", `Length: ${titleLength} chars`);
+      titleElement.innerHTML = htmlTitle;
     }
+    return true;
   },
 
   /**
-   * Toggle whether the title box is shown or hidden. Stores the state in localStorage to remember state for each domain.
-   * @return (void)
+   * タイトルバーの表示/非表示を切り替え、状態をlocalStorageに保存
    */
-  toggle_hide: function () {
-    if (this.div.className.match(/\bhide\b/)) {
-      this.div.className = this.div.className.replace(/hide/g, "");
-      localStorage["showtitle-hide"] = "false";
+  toggleHide() {
+    const { div } = this;
+    const hasHideClass = div.className.match(/\bhide\b/);
+
+    if (hasHideClass) {
+      div.className = div.className.replace(/hide/g, "").trim();
+      localStorage.setItem("showtitle-hide", "false");
     } else {
-      this.div.className += " hide";
-      localStorage["showtitle-hide"] = "true";
+      div.className += " hide";
+      localStorage.setItem("showtitle-hide", "true");
     }
   },
 
   /**
-   * Get the position setting (global)
-   * @return (void)
+   * グローバル位置設定を取得
    */
-  get_position: function () {
-    chrome.extension.sendRequest(
+  getPosition() {
+    chrome.runtime.sendMessage(
       {
         type: "get",
         key: "position",
       },
-      function (response) {
-        chrome_title_tag.set_position(response);
+      (response) => {
+        this.setPosition(response);
       }
     );
   },
 
   /**
-   * Move the title bar to the correct place and save the setting (global)
-   * @param {string} position     Where to put the title bar
-   * @return (void)
+   * タイトルバーを正しい位置に移動し、設定を保存
+   * @param {string} position - タイトルバーの位置
    */
-  set_position: function (position) {
-    var showtitlewrapper = document.getElementById("showtitlewrapper");
-    if (showtitlewrapper !== null) {
-      showtitlewrapper.className = position;
+  setPosition: function (position) {
+    const wrapper = document.getElementById("showtitlewrapper");
+    if (wrapper) {
+      wrapper.className = position;
       if (localStorage["showtitle-hide"] == "true") {
-        showtitlewrapper.className += " hide";
+        wrapper.className += " hide";
       }
     }
     chrome.extension.sendRequest(
@@ -95,15 +98,14 @@ var chrome_title_tag = {
   },
 
   /**
-   * Add event handlers (click on buttons etc)
-   * @return (void)
+   * イベントハンドラを設定（ボタンのクリックなど）
    */
-  add_handlers: function () {
-    var this_obj = this;
+  addHandlers: function () {
     document.getElementById("showtitleremovelink").onclick = function () {
-      this_obj.toggle_hide();
+      this.toggle_hide();
       return false;
     };
+
     document.getElementById("showtitlemove").onclick = function () {
       chrome.extension.sendRequest(
         {
@@ -111,23 +113,22 @@ var chrome_title_tag = {
           key: "position",
         },
         function (response) {
-          var new_pos = "";
-          if (response == "bottom_right") {
-            new_pos = "bottom_left";
-          } else if (response == "bottom_left") {
-            new_pos = "top_left";
-          } else if (response == "top_left") {
-            new_pos = "top_right";
-          } else {
-            new_pos = "bottom_right";
-          }
+          // 位置の循環: bottom_right → bottom_left → top_left → top_right → bottom_right
+          const positionMap = {
+            bottom_right: "bottom_left",
+            bottom_left: "top_left",
+            top_left: "top_right",
+            top_right: "bottom_right"
+          };
+          const newPosition = positionMap[response] || "bottom_right";
+
           chrome.extension.sendRequest(
             {
               type: "move",
-              position: new_pos,
+              position: newPosition,
             },
             function (response) {
-              this_obj.get_position();
+              this.get_position();
             }
           );
         }
@@ -141,22 +142,35 @@ var chrome_title_tag = {
    * @return (cake)
    */
   init: function () {
-    var this_obj = this;
     this.div.id = "showtitlewrapper";
     this.div.className = "not-initialized";
-    this.div.innerHTML =
-      '<p><span id="showtitle-title"></span> <span class="link" id="showtitlemove" title="Move this bar"><i class="icon-hand-down"></i><i class="icon-hand-up"></i><i class="icon-hand-right"></i><i class="icon-hand-left"></i></span> <span id="showtitleremovelink" class="link" title="Hide this bar"><i class="icon-eye-open"></i><i class="icon-eye-close"></i></span></p>';
+
+    // FontAwesomeアイコンを使用したHTML
+    this.div.innerHTML = `
+      <p>
+        <span id="showtitle-title"></span>
+        <span class="link" id="showtitlemove" title="Move this bar">
+          <i class="icon-hand-down"></i><i class="icon-hand-up"></i>
+          <i class="icon-hand-right"></i><i class="icon-hand-left"></i>
+        </span>
+        <span id="showtitleremovelink" class="link" title="Hide this bar">
+          <i class="icon-eye-open"></i><i class="icon-eye-close"></i>
+        </span>
+      </p>
+    `;
+    // DOMに追加する
     document.body.appendChild(this.div);
 
-    this.set_title();
+    // 初期設定
+    this.setTitle();
     this.get_position();
-    this.add_handlers();
+    this.addHandlers();
 
-    var observer = new MutationObserver(this.set_title);
+    const observer = new MutationObserver(this.setTitle);
     observer.observe(document.querySelector("title"), { childList: true });
 
-    setInterval("chrome_title_tag.get_position()", 2000);
+    setInterval("chromeTitleTag.get_position()", 2000);
   },
 };
 /* Initialize the plugin */
-chrome_title_tag.init();
+chromeTitleTag.init();
