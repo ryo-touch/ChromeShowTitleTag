@@ -21,8 +21,11 @@
  *  Work: Lead Product Designer @ http://kyruus.com
  */
 @font-face {
-  font-family: 'ShowTitleFontAwesome';
-  src: url('chrome-extension://__MSG_@@extension_id__/font/fontawesome-webfont.woff') format('woff'), url('chrome-extension://__MSG_@@extension_id__/font/fontawesome-webfont.ttf') format('truetype');
+  font-family: "ShowTitleFontAwesome";
+  src: url("chrome-extension://__MSG_@@extension_id__/font/fontawesome-webfont.woff")
+      format("woff"),
+    url("chrome-extension://__MSG_@@extension_id__/font/fontawesome-webfont.ttf")
+      format("truetype");
   font-weight: normal;
   font-style: normal;
 }
@@ -89,7 +92,7 @@
   font-size: 11px;
 }
 #showtitlewrapper .tolong {
-  color: #B60202;
+  color: #b60202;
 }
 #showtitlewrapper #showtitlemove i {
   display: none;
