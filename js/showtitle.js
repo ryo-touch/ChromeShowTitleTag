@@ -24,7 +24,7 @@ var chrome_title_tag = {
         htmltitle.slice(tolong_cutoff);
     }
 
-    htmltitle = htmlspecialchars(htmltitle);
+    htmltitle = htmlSpecialChars(htmltitle);
 
     if (htmltitle.length > tolong_cutoff) {
       htmltitle =

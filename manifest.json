@@ -6,7 +6,7 @@
   "content_scripts": [
     {
       "css": ["css/showtitle.css"],
-      "js": ["js/config.js", "js/showtitle.js"],
+      "js": ["js/showtitle.js"],
       "matches": ["http://*/*", "https://*/*"]
     }
   ],
