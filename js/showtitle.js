@@ -102,7 +102,7 @@ const chromeTitleTag = {
    */
   addHandlers: function () {
     document.getElementById("showtitleremovelink").onclick = function () {
-      this.toggle_hide();
+      this.toggleHide();
       return false;
     };
 
