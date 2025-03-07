@@ -97,7 +97,7 @@ const config = {
   },
 };
 
-chrome.extension.onRequest.addListener(function (
+chrome.runtime.onMessage.addListener(function (
   request,
   sender,
   sendResponse

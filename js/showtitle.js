@@ -88,7 +88,7 @@ const chromeTitleTag = {
         wrapper.className += " hide";
       }
     }
-    chrome.extension.sendRequest(
+    chrome.runtime.sendMessage(
       {
         type: "move",
         position: position,
@@ -102,12 +102,12 @@ const chromeTitleTag = {
    */
   addHandlers: function () {
     document.getElementById("showtitleremovelink").onclick = function () {
-      this.toggleHide();
+      chromeTitleTag.toggleHide();
       return false;
     };
 
     document.getElementById("showtitlemove").onclick = function () {
-      chrome.extension.sendRequest(
+      chrome.runtime.sendMessage(
         {
           type: "get",
           key: "position",
@@ -122,13 +122,13 @@ const chromeTitleTag = {
           };
           const newPosition = positionMap[response] || "bottom_right";
 
-          chrome.extension.sendRequest(
+          chrome.runtime.sendMessage(
             {
               type: "move",
               position: newPosition,
             },
             function (response) {
-              this.get_position();
+              chromeTitleTag.getPosition();
             }
           );
         }
@@ -163,13 +163,13 @@ const chromeTitleTag = {
 
     // 初期設定
     this.setTitle();
-    this.get_position();
+    this.getPosition();
     this.addHandlers();
 
     const observer = new MutationObserver(this.setTitle);
     observer.observe(document.querySelector("title"), { childList: true });
 
-    setInterval("chromeTitleTag.get_position()", 2000);
+    setInterval(() => chromeTitleTag.getPosition(), 2000);
   },
 };
 /* Initialize the plugin */
