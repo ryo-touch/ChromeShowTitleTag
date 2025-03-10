@@ -76,25 +76,56 @@ const config = {
 
 // Promiseを使用するようにメッセージハンドラを修正
 chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
-  if (request.type == "move") {
-    settings.set_position(request.position);
-    // 非同期処理を行うので、true を返して sendResponse を後で呼び出す
-    settings.get_position().then(position => {
-      sendResponse({ position: position });
-    });
-    return true; // 非同期レスポンスを示す
-  } else if (request.type == "set") {
-    config.set(request.key, request.value);
-    config.get(request.key).then(value => {
-      sendResponse(value);
-    });
-    return true; // 非同期レスポンスを示す
-  } else if (request.type == "get") {
-    settings.get_position().then(position => {
-      sendResponse(position);
-    });
-    return true; // 非同期レスポンスを示す
-  } else {
-    sendResponse({ error: "error" });
+  try {
+    if (request.type == "move") {
+      settings.set_position(request.position)
+        .then(position => {
+          return settings.get_position();
+        })
+        .then(position => {
+          sendResponse({ position: position });
+        })
+        .catch(error => {
+          sendResponse({ error: error.message });
+        });
+      return true; // 非同期レスポンスを示す
+    } else if (request.type == "get") {
+      // リクエストされたキーに基づいて処理を分岐
+      if (request.key === "position") {
+        settings.get_position()
+          .then(position => {
+            sendResponse(position);
+          })
+          .catch(error => {
+            sendResponse({ error: error.message });
+          });
+      } else {
+        // 他のキーの場合の処理
+        config.get(request.key)
+          .then(value => {
+            sendResponse(value);
+          })
+          .catch(error => {
+            sendResponse({ error: error.message });
+          });
+      }
+      return true; // 非同期レスポンスを示す
+    } else if (request.type == "set") {
+      config.set(request.key, request.value)
+        .then(() => {
+          return config.get(request.key);
+        })
+        .then(value => {
+          sendResponse(value);
+        })
+        .catch(error => {
+          sendResponse({ error: error.message });
+        });
+      return true; // 非同期レスポンスを示す
+    } else {
+      sendResponse({ error: "Unknown request type" });
+    }
+  } catch (e) {
+    sendResponse({ error: e.message });
   }
 });

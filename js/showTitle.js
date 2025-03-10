@@ -66,15 +66,23 @@ const chromeTitleTag = {
    * グローバル位置設定を取得
    */
   getPosition() {
-    chrome.runtime.sendMessage(
-      {
-        type: "get",
-        key: "position",
-      },
-      (response) => {
-        this.setPosition(response);
-      }
-    );
+    try {
+      chrome.runtime.sendMessage(
+        {
+          type: "get",
+          key: "position",
+        },
+        (response) => {
+          if (chrome.runtime.lastError) {
+            console.log('Chrome runtime error:', chrome.runtime.lastError);
+            return;
+          }
+          this.setPosition(response);
+        }
+      );
+    } catch (e) {
+      console.log('Failed to send message to extension:', e);
+    }
   },
 
   /**
@@ -179,7 +187,8 @@ const chromeTitleTag = {
     const observer = new MutationObserver(this.setTitle);
     observer.observe(document.querySelector("title"), { childList: true });
 
-    setInterval(() => chromeTitleTag.getPosition(), 2000);
+    // Check position every 300 seconds (5 minutes)
+    setInterval(() => chromeTitleTag.getPosition(), 300000);
   },
 };
 /* Initialize the plugin */
