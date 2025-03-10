@@ -6,9 +6,7 @@ This plugin will show the page title-tag in the bottom of the page, so you can s
 
 ## How Can I Use it?
 
-The plugin is currently on the Chrome web store: [Show Title tag](https://chrome.google.com/webstore/detail/pkbffbhglicfngmppdlpmpblfgnkdgio)
-
-## What if I want bleeding edge?
+It is not registered in the Google Web Store. It can be used by installing an extension saved in a local environment on the Chrome browser.
 
 - Do a git clone of this repository
 - Open up chrome to chrome://extensions
