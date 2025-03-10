@@ -27,6 +27,7 @@ const chromeTitleTag = {
     }
 
     // XSS対策で特殊文字の対策をする
+    // このメソッドは js/utils.js にあるものを呼び出している
     htmlTitle = htmlSpecialChars(htmlTitle);
 
     // 処理後タイトルの長さを取得してブラウザに表示するスタイルを変更する
@@ -46,7 +47,7 @@ const chromeTitleTag = {
   },
 
   /**
-   * タイトルバーの表示/非表示を切り替え、状態をlocalStorageに保存
+   * タイトルバーの表示/非表示を切り替え、状態をchrome.storage.localに保存
    */
   toggleHide() {
     const { div } = this;
@@ -54,10 +55,10 @@ const chromeTitleTag = {
 
     if (hasHideClass) {
       div.className = div.className.replace(/hide/g, "").trim();
-      localStorage.setItem("showtitle-hide", "false");
+      chrome.storage.local.set({ "showtitle-hide": "false" });
     } else {
       div.className += " hide";
-      localStorage.setItem("showtitle-hide", "true");
+      chrome.storage.local.set({ "showtitle-hide": "true" });
     }
   },
 
@@ -84,9 +85,12 @@ const chromeTitleTag = {
     const wrapper = document.getElementById("showtitlewrapper");
     if (wrapper) {
       wrapper.className = position;
-      if (localStorage["showtitle-hide"] == "true") {
-        wrapper.className += " hide";
-      }
+      // localStorage から chrome.storage.local へ変更
+      chrome.storage.local.get("showtitle-hide", (result) => {
+        if (result["showtitle-hide"] === "true") {
+          wrapper.className += " hide";
+        }
+      });
     }
     chrome.runtime.sendMessage(
       {
@@ -139,7 +143,6 @@ const chromeTitleTag = {
 
   /**
    * Initialize the plugin
-   * @return (cake)
    */
   init: function () {
     this.div.id = "showtitlewrapper";
@@ -165,6 +168,13 @@ const chromeTitleTag = {
     this.setTitle();
     this.getPosition();
     this.addHandlers();
+
+    // ローカルストレージの設定を読み込む
+    chrome.storage.local.get("showtitle-hide", (result) => {
+      if (result["showtitle-hide"] === "true") {
+        this.div.className += " hide";
+      }
+    });
 
     const observer = new MutationObserver(this.setTitle);
     observer.observe(document.querySelector("title"), { childList: true });

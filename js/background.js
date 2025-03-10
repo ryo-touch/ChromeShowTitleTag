@@ -1,123 +1,100 @@
-// 定数オブジェクトを関数の外に配置
-const HTML_ENTITY_OPTIONS = {
-  ENT_NOQUOTES: 0,
-  ENT_HTML_QUOTE_SINGLE: 1,
-  ENT_HTML_QUOTE_DOUBLE: 2,
-  ENT_COMPAT: 2,
-  ENT_QUOTES: 3,
-  ENT_IGNORE: 4,
-};
+function htmlSpecialChars(string, quoteStyle = 2, doubleEncode = true) {
+  // Service Worker(module) はutile.jsのメソッドを利活用できないので、utils.jsと同じ関数の実装をコピーして利用する
+  const QUOTE_STYLES = {
+    ENT_NOQUOTES: 0,
+    ENT_HTML_QUOTE_SINGLE: 1,
+    ENT_HTML_QUOTE_DOUBLE: 2,
+    ENT_COMPAT: 2,
+    ENT_QUOTES: 3,
+    ENT_IGNORE: 4,
+    ENT_SUBSTITUTE: 8,
+    ENT_DISALLOWED: 128,
+    ENT_HTML401: 0,
+    ENT_XML1: 16,
+    ENT_XHTML: 32,
+    ENT_HTML5: 48
+  };
 
-function htmlSpecialChars(string, quote_style = 2, charset = null, double_encode = true) {
-  // 変数を適切なスコープで宣言
-  let noquotes = false;
-  let optTemp = 0;
-
-  // 文字列に変換
-  string = string.toString();
-
-  // ダブルエンコードの処理
-  if (double_encode !== false) {
-    string = string.replace(/&/g, "&amp;");
+  if (typeof quoteStyle !== 'number') {
+    quoteStyle = QUOTE_STYLES.ENT_QUOTES;
   }
 
-  // 基本的なエスケープ処理
-  string = string.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
-  // quote_style が数値でない場合の処理
-  if (quote_style === 0) {
-    noquotes = true;
-  } else if (typeof quote_style !== "number") {
-    // 文字列または配列を処理
-    const styleArray = [].concat(quote_style);
-
-    for (let i = 0; i < styleArray.length; i++) {
-      const currentStyle = styleArray[i];
-      if (HTML_ENTITY_OPTIONS[currentStyle] === 0) {
-        noquotes = true;
-      } else if (HTML_ENTITY_OPTIONS[currentStyle]) {
-        optTemp |= HTML_ENTITY_OPTIONS[currentStyle];
-      }
-    }
-
-    quote_style = optTemp;
+  if (doubleEncode !== false) {
+    string = string.replace(/&/g, '&amp;');
   }
 
-  // シングルクォートの処理
-  if (quote_style & HTML_ENTITY_OPTIONS.ENT_HTML_QUOTE_SINGLE) {
-    string = string.replace(/'/g, "&#039;");
+  string = string.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  if (quoteStyle & QUOTE_STYLES.ENT_HTML_QUOTE_SINGLE) {
+    string = string.replace(/'/g, '&#039;');
   }
 
-  // ダブルクォートの処理
-  if (!noquotes) {
-    string = string.replace(/"/g, "&quot;");
+  if (quoteStyle & QUOTE_STYLES.ENT_HTML_QUOTE_DOUBLE) {
+    string = string.replace(/"/g, '&quot;');
   }
 
   return string;
 };
 
 const settings = {
-  get_position: function () {
-    return config.has("position") ? config.get("position") : "bottom_right";
+  get_position: async function () {
+    const result = await chrome.storage.local.get("position");
+    return result.position || "bottom_right";
   },
   set_position: function (corner) {
     corner = htmlSpecialChars(corner);
-    config.set("position", corner);
+    chrome.storage.local.set({ "position": corner });
   },
 };
 
+// configオブジェクトをchrome.storage.localを使用するように修正
 const config = {
-  has: function(key) {
-    return key in localStorage;
+  has: async function(key) {
+    const result = await chrome.storage.local.get(key);
+    return key in result;
   },
-  get: function(key) {
-    if (this.has(key)) {
-      try {
-        return JSON.parse(localStorage[key]);
-      } catch (e) {
-        return localStorage[key];
-      }
-    }
+  get: async function(key) {
+    const result = await chrome.storage.local.get(key);
+    return result[key];
   },
   set: function(key, value) {
-    try {
-      localStorage[key] = JSON.stringify(value);
-    } catch (err) {
-      if (err == QUOTA_EXCEEDED_ERR) {
-        alert("Storage quota exceeded for Chrome Title Tag.");
-      }
-    }
+    const data = {};
+    data[key] = value;
+    chrome.storage.local.set(data).catch(err => {
+      console.error("Storage error:", err);
+    });
   },
-  defaults: function(vals) {
+  defaults: async function(vals) {
     for (const key in vals) {
-      if (!this.has(key)) {
+      const exists = await this.has(key);
+      if (!exists) {
         this.set(key, vals[key]);
       }
     }
   },
 };
 
-chrome.runtime.onMessage.addListener(function (
-  request,
-  sender,
-  sendResponse
-) {
+// Promiseを使用するようにメッセージハンドラを修正
+chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
   if (request.type == "move") {
-    // タイトルバーの位置を変更して、新しい位置を返す
     settings.set_position(request.position);
-    sendResponse({
-      position: settings.get_position(),
+    // 非同期処理を行うので、true を返して sendResponse を後で呼び出す
+    settings.get_position().then(position => {
+      sendResponse({ position: position });
     });
+    return true; // 非同期レスポンスを示す
   } else if (request.type == "set") {
-    // request の任意のキーと値のペアを localStorage に保存する
     config.set(request.key, request.value);
-    sendResponse(config.get(request.key));
-  } else if (request.type == "get") {
-    //タイトルバーの位置を返す
-    sendResponse(settings.get_position());
-  } else {
-    sendResponse({
-      error: "error",
+    config.get(request.key).then(value => {
+      sendResponse(value);
     });
+    return true; // 非同期レスポンスを示す
+  } else if (request.type == "get") {
+    settings.get_position().then(position => {
+      sendResponse(position);
+    });
+    return true; // 非同期レスポンスを示す
+  } else {
+    sendResponse({ error: "error" });
   }
 });

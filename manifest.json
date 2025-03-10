@@ -7,7 +7,7 @@
   "content_scripts": [
     {
       "css": ["css/showtitle.css"],
-      "js": ["js/showtitle.js"],
+      "js": ["js/utils.js", "js/showtitle.js"],
       "matches": ["http://*/*", "https://*/*"]
     }
   ],
@@ -32,7 +32,7 @@
       "128": "img/icon128.png"
     }
   },
-  "permissions": [],
+  "permissions": ["storage"],
   "host_permissions": ["http://*/*", "https://*/*"],
   "version": "3.0"
 }
